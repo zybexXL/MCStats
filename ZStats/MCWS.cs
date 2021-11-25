@@ -13,30 +13,32 @@ namespace ZStats
 {
     public class MCWS
     {
-        string host;
+        public string hostURL { get; private set; }
         string user;
         string pass;
 
         HttpClient http;
         bool debug = false;
+        
+        public int status { get; private set; }
 
         public MCWS(string server, string username, string password, bool verbose = false)
         {
-            host = server.ToLower();
+            hostURL = server.ToLower();
             user = username;
             pass = password;
             debug = verbose;
 
-            if (!host.Contains(":") && !host.EndsWith("/")) host = $"{host}:52199";
+            if (!hostURL.Contains(":") && !hostURL.EndsWith("/")) hostURL = $"{hostURL}:52199";
             
-            if (!host.StartsWith("http"))
-                host = $"http://{host}";
+            if (!hostURL.StartsWith("http"))
+                hostURL = $"http://{hostURL}";
 
-            host = host.TrimEnd('/') + "/MCWS/v1/";
+            hostURL = hostURL.TrimEnd('/') + "/MCWS/v1/";
 
             HttpClientHandler handler = new HttpClientHandler();
             http = new HttpClient();
-            http.BaseAddress = new Uri(host);
+            http.BaseAddress = new Uri(hostURL);
             var authToken = Encoding.ASCII.GetBytes($"{user}:{pass}");
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic",Convert.ToBase64String(authToken));
             http.DefaultRequestHeaders.ConnectionClose = true;      // MC is slow with connection=keep-alive
@@ -63,7 +65,8 @@ namespace ZStats
                     debugstr = answer != null && answer.Length < 75 ? $"'{answer.Replace('\r', '.').Replace('\n', '.')}'" : $"{answer.Length} bytes";
                     if (debug && printDebug) Console.WriteLine($"  <- MCWS says: {response.StatusCode}, {debugstr}");
 
-                    return (int)(response.StatusCode);
+                    status = (int)(response.StatusCode);
+                    return status;
                 }
             }
             catch (Exception ex)
@@ -71,21 +74,31 @@ namespace ZStats
                 if (debug)
                     Console.WriteLine($"  HTTP Exception: {ex.Message} :: {ex.InnerException?.Message}");
             }
+            status = 0;
             return 0;
+        }
+
+        public bool GetVersion(out Version version, out string appName, out string platform, out string servername)
+        {
+            appName = platform = servername = null;
+            version = new Version();
+            
+            if (HttpGet("Alive", out string xml) != 200)
+                return false;
+            
+            var props = Regex.Matches(xml, "<Item Name=\"(.+?)\">(.+?)</Item>").Cast<Match>().ToDictionary(m => m.Groups[1].Value, m => m.Groups[2].Value);
+            props.TryGetValue("ProgramName", out appName);
+            props.TryGetValue("Platform", out platform);
+            props.TryGetValue("FriendlyName", out servername);
+            if (props.TryGetValue("ProgramVersion", out string ver)) version = Version.Parse(ver);
+            else return false;
+            
+            return true;
         }
 
         public bool Authenticate()
         {
-            var status = HttpGet("Authenticate", out string result);
-            if (status == 0)
-                Console.WriteLine($"Could not connect to MCWS at {host}");
-            if (status == 401)
-                Console.WriteLine("Invalid MCWS credentials - please check username and password");
-            if (status != 200)
-                Console.WriteLine($"Connection to {host} failed with status code {status}");
-            else
-                Console.WriteLine($"Connected to {host}");
-            return status == 200;
+            return HttpGet("Authenticate", out string xml) == 200;
         }
 
         public string SearchFiles(string filter, List<string> fields)
@@ -96,9 +109,7 @@ namespace ZStats
             if (!string.IsNullOrEmpty(filter))
                 url += $"&Query={Uri.EscapeUriString(filter)}";
 
-            int status = HttpGet(url, out string result);
-            if (status != 200) return null;
-            return result;
+            return HttpGet(url, out string result) == 200 ? result : null;
         }
 
         public List<string> GetFields()
@@ -115,20 +126,21 @@ namespace ZStats
             value = Uri.EscapeUriString(value);
             field = Uri.EscapeUriString(field);
             string formatted = formattedValue ? "1" : "0";
-            int status = HttpGet($"File/SetInfo?File={filekey}&Field={field}&Value={value}&Formatted={formatted}", out string xml, false);
-            if (xml.Contains("Information=\"No changes.\""))
+            HttpGet($"File/SetInfo?File={filekey}&Field={field}&Value={value}&Formatted={formatted}", out string xml, false);
+            if (xml != null && xml.Contains("Information=\"No changes.\""))
                 status = 200;
             return status == 200;
         }
 
         public bool EvaluateExpression(int filekey, string expression, out string result)
         {
-            expression = Uri.EscapeUriString(expression);
             result = "";
-            int status = HttpGet($"File/GetFilledTemplate?File={filekey}&Expression={expression}", out string xml, false);
-            var match = Regex.Match(xml, @"<Item Name=""Value"">(.*?)</Item>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            expression = Uri.EscapeUriString(expression);
+            if (HttpGet($"File/GetFilledTemplate?File={filekey}&Expression={expression}", out string xml, false) != 200)
+                return false;
+            var match = Regex.Match(xml ?? "", @"<Item Name=""Value"">(.*?)</Item>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             if (match.Success) result = Uri.UnescapeDataString(match.Groups[1].Value);
-            return status == 200;
+            return true;
         }
 
         public List<MCPlaylist> GetPlayLists()
@@ -147,39 +159,35 @@ namespace ZStats
 
         public bool DeletePlaylist(string name)
         {
-            int status = HttpGet($"Playlist/Delete?PlaylistType=Path&Playlist={Uri.EscapeUriString(name)}", out _);
-            return status == 200;
+            return HttpGet($"Playlist/Delete?PlaylistType=Path&Playlist={Uri.EscapeUriString(name)}", out _) == 200;
         }
 
         public bool DeletePlaylist(int id)
         {
-            int status = HttpGet($"Playlist/Delete?PlaylistType=ID&Playlist={id}", out _);
-            return status == 200;
+            return HttpGet($"Playlist/Delete?PlaylistType=ID&Playlist={id}", out _) == 200;
         }
 
         public bool CreatePlaylist(string name, out int playlistID, bool overwrite = true)
         {
+            playlistID = 0;
             string mode = overwrite ? "Overwrite" : "Rename";
-            playlistID = 0; 
-            int status = HttpGet($"Playlists/Add?Type=Playlist&Path={Uri.EscapeUriString(name)}&CreateMode={mode}", out string xml);
+            if (HttpGet($"Playlists/Add?Type=Playlist&Path={Uri.EscapeUriString(name)}&CreateMode={mode}", out string xml) != 200)
+                return false;
             var m = Regex.Match(xml ?? "", @"""PlaylistID"">(\d+)<");
-            if (status == 200 && m.Success)
-                int.TryParse(m.Groups[1].Value, out playlistID);
-            return status == 200;
+            return m.Success && int.TryParse(m.Groups[1].Value, out playlistID);
         }
 
         public bool BuildPlaylist(string name, List<int> fileIDs, out int playlistID)
         {
+            playlistID = 0;
             if (fileIDs == null || fileIDs.Count == 0)
                 return CreatePlaylist(name, out playlistID);
 
             string keys = string.Join(",", fileIDs);
-            playlistID = 0;
-            int status = HttpGet($"Playlist/Build?Playlist={Uri.EscapeUriString(name)}&Keys={keys}", out string xml);
+            if (HttpGet($"Playlist/Build?Playlist={Uri.EscapeUriString(name)}&Keys={keys}", out string xml) != 200)
+                return false;
             var m = Regex.Match(xml ?? "", @"""PlaylistID"">(\d+)<"); 
-            if (status == 200 && m.Success)
-                int.TryParse(m.Groups[1].Value, out playlistID);
-            return status == 200;
+            return m.Success && int.TryParse(m.Groups[1].Value, out playlistID);
         }
 
         public bool CreateField(string name)

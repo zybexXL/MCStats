@@ -22,9 +22,11 @@ namespace ZStats
         static Config config;
         static MCFile[] files;
 
+        static readonly Version RequiredVersion = new Version(28, 0, 48);
+
         static void Main(string[] args)
         {
-            Console.WriteLine("ZStats v0.90 for JRiver MediaCenter, by Zybex\n");
+            Console.WriteLine("ZStats v0.91 for JRiver MediaCenter, by Zybex\n");
             DateTime start = DateTime.Now;
             try
             {
@@ -32,7 +34,8 @@ namespace ZStats
                 config = Config.Load(configfile, true);
                 if (config == null) return;
 
-                runStats();
+                if (Connect())
+                    runStats();
             }
             catch (Exception ex)
             {
@@ -42,12 +45,41 @@ namespace ZStats
             Thread.Sleep(3000);
         }
 
-        static void runStats()
+        static bool Connect()
         {
             mc = new MCWS(config.MCserver, config.MCuser, config.MCpass, debug);
-            if (!mc.Authenticate())
-                return;
+            Console.WriteLine($"Connecting to {mc.hostURL}");
 
+            if (!mc.GetVersion(out Version ver, out string app, out string platform, out string friendly))
+            {
+                if (mc.status == 0)
+                    Console.WriteLine($"Could not connect to MCWS at {mc.hostURL}");
+                else
+                    Console.WriteLine($"Connection to {mc.hostURL} failed with status code {mc.status}");
+                return false;
+            }
+
+            if (ver < RequiredVersion)
+            {
+                Console.WriteLine($"This application requires MC {RequiredVersion} or above. Please upgrade.");
+                return false;
+            }
+
+            Console.WriteLine($"Connected to {app} {ver} on {friendly}");
+            if (!mc.Authenticate())
+            {
+                if (mc.status == 401)
+                    Console.WriteLine("Invalid MCWS credentials - please check username and password");
+                else
+                    Console.WriteLine($"Authentication failed with error {mc.status}");
+                return false;
+            }
+
+            return true;
+        }
+
+        static void runStats()
+        {
             if (!ReadFiles(false)) return;
             if (files.Length == 0)
             {
