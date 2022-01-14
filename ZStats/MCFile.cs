@@ -1,9 +1,11 @@
-﻿using System;
+﻿using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace ZStats
@@ -20,19 +22,22 @@ namespace ZStats
         [DataMember]
         public string History { get; set; }
 
-        [DataMember]
-        public string Stats { get; set; }
+        public string getProperty(string name) => jsonObject.GetValue(name)?.ToString();
 
-        public string newStats;
+        public JObject jsonObject;
+
         public List<DateTime> played;
         public Dictionary<string, int> ComputedStats;
-        public List<int> yearlyStats;
+        public Dictionary<string, List<int>> yearlyStats;
         public List<int> monthlyStats;
+        public List<int> weekdayStats;
         public DateTime LastPlayed = DateTime.MinValue;
+        public int startYear = 9999;    // no data
 
         static readonly Random rand = new Random();
 
         public int StatsValue(string token) { if (ComputedStats.TryGetValue(token, out int count)) return count; return 0; }
+        public List<int> YearStatsValue(string token) { if (yearlyStats.TryGetValue(token, out var counts)) return counts; return new List<int>(); }
 
         void GenerateRandomDates()      // debug method to generate random History
         {
@@ -49,6 +54,7 @@ namespace ZStats
             //GenerateRandomDates();
 #endif
             if (!ParseHistory(dateFormat, offsetMinutes)) return false;
+            if (played.Count > 0) startYear = played.Min(p => p.Year);
             return true;
         }
 
@@ -57,7 +63,7 @@ namespace ZStats
             played = new List<DateTime>();
             if (string.IsNullOrEmpty(History)) return true;
 
-            var entries = History.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+            var entries = History.Split(new string[] { Program.config.listSeparator }, StringSplitOptions.RemoveEmptyEntries);
             bool numeric = Double.TryParse(entries[0], out _);
 
             string currEntry = null;
@@ -67,7 +73,7 @@ namespace ZStats
                 {
                     currEntry = entry;
                     DateTime date;
-                    if (numeric) date = ExcelDate(Double.Parse(entry));
+                    if (numeric) date = Util.Excel2Datetime(Double.Parse(entry));
                     else if (string.IsNullOrEmpty(dateFormat))
                         date = DateTime.Parse(entry, CultureInfo.CurrentCulture, DateTimeStyles.None);
                     else
@@ -86,11 +92,5 @@ namespace ZStats
                 return false;
             }
         }
-
-        DateTime ExcelDate(double days1900)
-        {
-            return new DateTime(1899, 12, 30).AddDays(days1900);
-        }
     }
-
 }

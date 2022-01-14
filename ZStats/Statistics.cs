@@ -10,181 +10,128 @@ namespace ZStats
 
     public class Statistics
     {
-        DateTime Now, NowOffset;
-        DateTime Yesterday, Ereyesterday;
-        DateTime WeekStart, PrevWeekStart;
-        int prevMonth, prevMonthYear;
-        
         Config config;
-        MCFile[] files;
-        List<SortToken> tokens;
-
+        public List<Token> uniqueTokens = new List<Token>();
         public int totalPlays = 0;
+        public int startYear;       // first year seen in PlayHistory
 
-        public Statistics(MCFile[] files, Config config)
+        public Statistics(Config config)
         {
-            Now = DateTime.Now;
-            NowOffset = Now.AddMinutes(-config.midnightOffset);     // correction for offset added to History timestamps
-            
-            this.files = files;
             this.config = config;
-            
-            Yesterday = Now.Date.AddDays(-1);
-            Ereyesterday = Now.Date.AddDays(-2); 
-            WeekStart = Now.Date.AddDays(-(int)Now.DayOfWeek);
-            PrevWeekStart = WeekStart.AddDays(-7);
-            prevMonth = Now.Date.AddMonths(-1).Month;
-            prevMonthYear = Now.Date.AddMonths(-1).Year;
-            
-            List<string> tokenList = Regex.Matches(config.statsTemplate, @"\[(\w+?|\w+\d+[hdm]|[ymd]\d+)\]").Cast<Match>().Select(m=>m.Groups[1].Value.ToLower()).ToList();
-            tokenList.AddRange(config.playlists.Select(p => p.sort.ToLower()).ToList());
-            tokenList = tokenList.Distinct().ToList();
-
-            tokens = tokenList.Select(t => SortToken.Parse(t, NowOffset)).ToList();
         }
 
-        public bool Compute()
+        public bool Compute(List<MCFile> files)
         {
             Console.WriteLine($"  Computing statistics");
-            foreach (var file in files)
-            {
-                file.Process(config.historyFormat, config.midnightOffset);
-                if (!ComputeStats(file, config.statsTemplate))
-                    return false;
-                totalPlays += file.played.Count;
-            }
 
-            Console.WriteLine($"  Preparing playlists");
-            List<MCFile> sortedFiles = files.OrderByDescending(f => f.LastPlayed).ToList();
+            // parse History values
+            foreach (var file in files)
+                file.Process(config.historyFormat, config.midnightOffset);
+
+            // find earliest History date/year, expand [perYear] playlists
+            totalPlays = files.Sum(f => f.played.Count);
+            startYear = files.Min(f => f.startYear);
+            if (startYear > 3000) startYear = config.Now.Year;
+            if (startYear < 2000) startYear = 2000;
+
             if (config.updatePlaylists)
+                config.expandPlaylistYears(startYear);
+
+            // calculate file stats
+            foreach (var file in files)
+            if (!ComputeStats(file))
+                return false;
+
+            // populate playlists with top files
+            if (config.updatePlaylists)
+            { 
+                Console.WriteLine($"  Preparing playlists");
+                List<MCFile> sortedFiles = files.OrderByDescending(f => f.LastPlayed).ToList();
                 foreach (var playlist in config.playlists)
-                    GeneratePlaylist(playlist, sortedFiles);
+                    PopulatePlaylist(playlist, sortedFiles);
+            }
 
             return true;
         }
 
-        private bool ComputeStats(MCFile file, string template)
+        private bool ComputeStats(MCFile file)
         {
             file.ComputedStats = new Dictionary<string, int>();
-            file.yearlyStats = new List<int>();
+            file.yearlyStats = new Dictionary<string, List<int>>();
             file.monthlyStats = new List<int>();
+            file.weekdayStats = new List<int>(); 
             file.LastPlayed = file.played.Count == 0 ? DateTime.MinValue : file.played.Min(p => p);
 
-            foreach (var tokenObj in tokens)
+            foreach (var tokenObj in config.uniqueTokens)
             {
-                string token = tokenObj.token;
-                switch (token)
+                string token = tokenObj.text;
+                switch (tokenObj.type)
                 {
-                    case "total":
-                        file.ComputedStats[token] = file.played.Count;
+                    case TokenType.Range:
+                        file.ComputedStats[token] = file.played.Count(p => p >= tokenObj.start && p < tokenObj.end);
                         break;
-                    case "year":
-                        file.ComputedStats[token] = file.played.Count(p => p.Year == Now.Year);
+                    case TokenType.Weekday:
+                        file.ComputedStats[token] = file.played.Count(p => tokenObj.values.Contains((int)p.DayOfWeek));
                         break;
-                    case "month":
-                        file.ComputedStats[token] = file.played.Count(p => p.Year == Now.Year && p.Month == Now.Month);
+                    case TokenType.Month:
+                        file.ComputedStats[token] = file.played.Count(p => tokenObj.values.Contains((int)p.Month));
                         break;
-                    case "week":
-                        file.ComputedStats[token] = file.played.Count(p => p >= WeekStart && p < Now);
+                    case TokenType.Year:
+                        file.ComputedStats[token] = file.played.Count(p => tokenObj.values.Contains((int)p.Year));
                         break;
-
-                    case "today":
-                        file.ComputedStats[token] = file.played.Count(p => p.Date == Now.Date);
-                        break;
-                    case "yesterday":
-                        file.ComputedStats[token] = file.played.Count(p => p.Date == Yesterday);
-                        break;
-                    case "twodaysago":
-                        file.ComputedStats[token] = file.played.Count(p => p.Date == Ereyesterday);
-                        break;
-
-                    case "weekends":
-                        file.ComputedStats[token] = file.played.Count(p => p.DayOfWeek == DayOfWeek.Saturday || p.DayOfWeek == DayOfWeek.Sunday);
-                        break;
-
-                    case "prevyear":
-                        file.ComputedStats[token] = file.played.Count(p => p.Year == Now.Year - 1);
-                        break;
-                    case "prevmonth":
-                        file.ComputedStats[token] = file.played.Count(p => p.Year == prevMonthYear && p.Month == prevMonth);
-                        break;
-                    case "prevweek":
-                        file.ComputedStats[token] = file.played.Count(p => p >= PrevWeekStart && p < WeekStart);
-                        break;
-
-                    case "unplayed":
+                    case TokenType.Unplayed:
                         file.ComputedStats[token] = file.LastPlayed == DateTime.MinValue ? 1 : 0;
                         break;
-                    case "recent":
-                        file.ComputedStats[token] = file.LastPlayed == DateTime.MinValue ? 0 : 1;
+                    case TokenType.Recent:
+                        file.ComputedStats[token] = file.LastPlayed < config.Now.AddMonths(-1) ? 0 : 1;
                         break;
-                    case "lastplay":
-                        file.ComputedStats[token] = 0;
+                    case TokenType.Unpopular:
+                        file.ComputedStats[token] = file.LastPlayed < config.Now.AddYears(-1) ? 1 : 0;
                         break;
-
-                    case "yearly":
-                        for (int i = config.yearlyBase; i <= Now.Year; i++)
-                            file.yearlyStats.Add(file.played.Count(p => p.Year == i));
+                    case TokenType.PerWeekday:
+                        for (int i = 0; i <= 6; i++)
+                            file.weekdayStats.Add(file.played.Count(p => (int)p.DayOfWeek == i));    // TODO: user-defined weekstart
                         break;
-
-                    case "monthly":
-                        for (int i = 1; i < 13; i++)
+                    case TokenType.PerMonth:
+                        for (int i = 1; i <= 12; i++)
                             file.monthlyStats.Add(file.played.Count(p => p.Month == i));
                         break;
-
-                    case "range":
-                        token = tokenObj.iniToken;
-                        int period = tokenObj.period;
-                        switch (tokenObj.range)
-                        {
-                            case "y":
-                                file.ComputedStats[token] = file.played.Count(p => p.Year == tokenObj.period);
-                                break;
-                            case "m":
-                                file.ComputedStats[token] = file.played.Count(p => p.Month == tokenObj.period); 
-                                break;
-                            case "prev":
-                            case "last":
-                                file.ComputedStats[token] = file.played.Count(p => p >= tokenObj.start && p < tokenObj.end);
-                                break;
-                        }
+                    case TokenType.PerYear:
+                        int year1 = tokenObj.values != null && tokenObj.values.Count > 0 ? tokenObj.values[0] : startYear;
+                        List<int> counts = new List<int>();
+                        for (int i = year1; i <= config.Now.Year; i++)
+                            counts.Add(file.played.Count(p => p.Year == i));
+                        file.yearlyStats[token] = counts;
                         break;
+
                     default:
                         tokenObj.invalid = true;
                         break;
                 }
                 if (tokenObj.invalid)
                 {
-                    Console.WriteLine($"  ERROR - invalid sort token in config file: {token}");
+                    Console.WriteLine($"  ERROR - invalid sort token in config file: [{token}]");
                     return false;
                 }
-
-                string value = file.StatsValue(token).ToString();
-                if (token == "yearly") value = string.Join(config.statsSeparator, file.yearlyStats);
-                if (token == "monthly") value = string.Join(config.statsSeparator, file.monthlyStats);
-                template = Regex.Replace(template, $@"\[{token}\]", value, RegexOptions.IgnoreCase);
-                file.newStats = template;
-            }
-            
+            }       
             return true;
         }
 
-        private bool GeneratePlaylist(MCPlaylist playlist, List<MCFile> files)
+        private bool PopulatePlaylist(MCPlaylist playlist, List<MCFile> files)
         {
-            var token = SortToken.Parse(playlist.sort, NowOffset);
-            switch (token.token)
+            switch (playlist.sortToken.type)
             {
-                case "unplayed":
+                case TokenType.Unplayed:
                     playlist.files = files.Where(f => f.LastPlayed == DateTime.MinValue).OrderByDescending(f => f.Imported).ToList();
                     break;
-                case "recent":
+                case TokenType.Recent:
                     playlist.files = files.Where(f => f.LastPlayed != DateTime.MinValue).OrderByDescending(f => f.LastPlayed).ToList();
                     break;
-                case "lastplay":
+                case TokenType.Unpopular:
                     playlist.files = files.Where(f => f.LastPlayed != DateTime.MinValue).OrderBy(f => f.LastPlayed).ToList();
                     break;
                 default:
-                    playlist.files = files.Where(f => f.StatsValue(token.iniToken) > 0).OrderByDescending(f => f.StatsValue(token.iniToken)).ToList();
+                    playlist.files = files.Where(f => f.StatsValue(playlist.sortToken.text) > 0).OrderByDescending(f => f.StatsValue(playlist.sortToken.text)).ToList();
                     break;
             }
 

@@ -10,15 +10,14 @@ namespace ZStats
     {
         public int id;
         public string name;
-        public string sort;
         public int max;
-        public SortToken sortToken;
+        public Token sortToken;
         public List<MCFile> files;
 
-        public MCPlaylist(string name, string sort, int count)
+        public MCPlaylist(string name, Token sort, int count)
         {
             this.name = name;
-            this.sort = sort.ToLower().Trim('[', ']');
+            this.sortToken = sort;
             this.max = count;
         }
 

@@ -167,6 +167,16 @@ namespace ZStats
             return HttpGet($"Playlist/Delete?PlaylistType=ID&Playlist={id}", out _) == 200;
         }
 
+        public bool ClearPlaylist(int id)
+        {
+            return HttpGet($"Playlist/Clear?PlaylistType=ID&Playlist={id}", out _) == 200;
+        }
+
+        public bool RemovePlaylistDuplicates(int id)
+        {
+            return HttpGet($"Playlist/RemoveDuplicates?PlaylistType=ID&Playlist={id}", out _) == 200;
+        }
+
         public bool CreatePlaylist(string name, out int playlistID, bool overwrite = true)
         {
             playlistID = 0;
@@ -175,6 +185,18 @@ namespace ZStats
                 return false;
             var m = Regex.Match(xml ?? "", @"""PlaylistID"">(\d+)<");
             return m.Success && int.TryParse(m.Groups[1].Value, out playlistID);
+        }
+
+        public bool AddPlaylistFiles(int id, List<int> fileIDs, bool removeDuplicates = false)
+        {
+            if (fileIDs == null || fileIDs.Count == 0)
+                return true;
+            
+            string keys = string.Join(",", fileIDs);
+            bool ok = (HttpGet($"Playlist/AddFiles?PlaylistType=ID&Playlist={id}&Keys={keys}", out string xml) == 200);
+            if (ok && removeDuplicates)
+                ok &= RemovePlaylistDuplicates(id);
+            return ok;
         }
 
         public bool BuildPlaylist(string name, List<int> fileIDs, out int playlistID)

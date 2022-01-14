@@ -1,7 +1,10 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -19,27 +22,36 @@ namespace ZStats
 #endif
 
         static MCWS mc;
-        static Config config;
-        static MCFile[] files;
+        public static Config config;
+        static List<MCFile> files = new List<MCFile>();
 
-        static readonly Version RequiredVersion = new Version(28, 0, 48);
+        static readonly Version RequiredVersion = new Version(28, 0, 93);
+        static readonly Version ZStatsVersion = new Version(0, 9, 4);
 
         static void Main(string[] args)
         {
-            Console.WriteLine("ZStats v0.91 for JRiver MediaCenter, by Zybex\n");
+            Console.WriteLine($"ZStats v{ZStatsVersion} for JRiver MediaCenter, by Zybex\n");
             DateTime start = DateTime.Now;
+            if (args.Length > 0 && Regex.IsMatch(args[0], @"^[-/]"))
+            {
+                Console.WriteLine("Usage: ZStats [zstats.ini]");
+                Console.WriteLine("If no config file is given and no 'zstats.ini' exists in the current folder, a new sample one is created.");
+                return;
+            }
             try
             {
                 string configfile = args.Length > 0 ? args[0] : "zstats.ini";
                 config = Config.Load(configfile, true);
-                if (config == null) return;
+                if (config == null && args.Length == 0) 
+                    config = Config.Load(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), configfile), true);
+                if (config == null || !config.valid) return;
 
                 if (Connect())
                     runStats();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An exception occurred during execution! Please repotr this issue to the developer:\n{ex}");
+                Console.WriteLine($"An exception occurred during execution! Please report this issue to the developer:\n{ex}");
             }
             Console.WriteLine($"\nFinished in {DateTime.Now-start:hh':'mm':'ss}");
             Thread.Sleep(3000);
@@ -80,36 +92,38 @@ namespace ZStats
 
         static void runStats()
         {
-            if (!ReadFiles(false)) return;
-            if (files.Length == 0)
+            if (!ReadMCFiles(false)) return;
+            if (files.Count == 0)
             {
                 Console.WriteLine("No files found, please check the MCFilter in the config file!");
                 return;
             }
 
             if (config.runExpressions && !string.IsNullOrWhiteSpace(config.runBefore.Trim()))
-                if (!RunExpression(config.runBefore, "[RunBefore]")) return;
+                if (!RunMCExpression(config.runBefore, "[RunBefore]")) return;
 
             if (config.updateStats || config.updatePlaylists)
             {
-                if (!CheckFields()) return;
+                if (!CheckMCFields()) return;
 
-                if (!ReadFiles(true)) return;   
+                if (!ReadMCFiles(true)) return;   
 
                 if (!ProcessFiles()) return;
 
                 if (config.updateStats)
-                    if (!UpdateStats()) return;
+                    if (!UpdateMCStats()) return;
 
                 if (config.updatePlaylists)
-                    if (!UpdatePlayLists()) return;
+                    if (!UpdateMCPlayLists()) return;
             }
 
             if (config.runExpressions && !string.IsNullOrWhiteSpace(config.runAfter.Trim()))
-                if (!RunExpression(config.runAfter, "[RunAfter]")) return;
+                if (!RunMCExpression(config.runAfter, "[RunAfter]")) return;
         }
 
-        static bool CheckFields()
+        // get the list of MC Fields and check if we need to create any new field
+        // Optionally creates missing fields
+        static bool CheckMCFields()
         {
             Console.WriteLine("Checking fields");
             var fields = mc.GetFields();
@@ -118,58 +132,85 @@ namespace ZStats
                 Console.WriteLine("  Failed to get list of Fields!");
                 return false;
             }
-            bool hasStats = fields.Contains(config.statsField, StringComparer.InvariantCultureIgnoreCase);
-            bool hasHistory = fields.Contains(config.historyField, StringComparer.InvariantCultureIgnoreCase);
 
-            if (config.updateStats && !hasStats)
+            if (!fields.Contains(config.historyField, StringComparer.InvariantCultureIgnoreCase))
             {
-                Console.WriteLine($"  field [{config.statsField}] is missing");
-                if (!config.createFields) return false;
-                if (!mc.CreateField(config.statsField))
+                Console.WriteLine($"  history field [{config.historyField}] does not exist");
+                //if (!config.createFields) return false;
+                //if (!mc.CreateField(config.historyField))
                     return false;
             }
 
-            if (config.updateStats && !hasHistory)
+            if (config.updateStats)
             {
-                Console.WriteLine($"  field [{config.historyField}] is missing");
-                if (!config.createFields) return false;
-                if (!mc.CreateField(config.historyField))
-                    return false;
+                foreach (var group in config.statGroups)
+                {
+                    if (!group.enabled) continue;
+                    if (!fields.Contains(group.UpdateField, StringComparer.InvariantCultureIgnoreCase))
+                    {
+                        Console.WriteLine($"  field [{group.UpdateField}] does not exist");
+                        if (!config.createFields) return false;
+                        if (!mc.CreateField(group.UpdateField))
+                            return false;
+                    }
+                    if (group.GroupByField.ToLower() != "key" && !fields.Contains(group.GroupByField, StringComparer.InvariantCultureIgnoreCase))
+                    {
+                        Console.WriteLine($"  grouping field [{group.UpdateField}] does not exist");
+                        //if (!config.createFields) return false;
+                        //if (!mc.CreateField(group.UpdateField))
+                            return false;
+                    }
+                }
             }
 
             return true;
         }
 
-        static bool ReadFiles(bool withHistory)
+        // reads the list of MC files and their relevant fields
+        static bool ReadMCFiles(bool withHistory)
         {
             Console.WriteLine($"Reading {(withHistory ? "play history" : "file list")}");
             var fields = new List<string> { "key", "name", "date imported" };
             if (withHistory)
             {
-                fields.Add(config.statsField);
+                fields.AddRange(config.groupbyFields);
+                fields.AddRange(config.outputFields);
                 fields.Add(config.historyField);
+                fields = fields.Distinct().ToList();
             }
 
-            string data = mc.SearchFiles(config.MCfilter, fields);
-            if (data == null) return false;
-
-            data = Regex.Replace(data, $"\"{config.statsField}\":", "\"Stats\":", RegexOptions.IgnoreCase);
-            data = Regex.Replace(data, $"\"{config.historyField}\":", "\"History\":", RegexOptions.IgnoreCase);
-            
-            if (!Util.TryJsonDeserialize<MCFile[]>(data, out files) || files == null)
+            try
             {
-                Console.WriteLine("  Failed to deserialize MCWS response!");
+                string data = mc.SearchFiles(config.MCfilter, fields);
+                if (data == null) return false;
+
+                data = Regex.Replace(data, $"\"{config.historyField}\":", "\"History\":", RegexOptions.IgnoreCase);
+                var objList = JArray.Parse(data);
+
+                files = new List<MCFile>();
+                foreach (JObject obj in objList)
+                {
+                    MCFile file = obj.ToObject<MCFile>();
+                    file.jsonObject = obj;
+                    files.Add(file);
+                }
+            }
+            catch 
+            {
+                Console.WriteLine("  Failed to understand MCWS response!");
                 return false;
             }
-            Console.WriteLine($"  {files.Length} files read");
-            return files.Length > 0;
+            Console.WriteLine($"  {files.Count} files read");
+            return files.Count > 0;
         }
 
+        // compute statistics for all files
         static bool ProcessFiles()
         {
+            
             Console.WriteLine("Munching data");
-            Statistics stats = new Statistics(files, config);
-            if (!stats.Compute())
+            Statistics stats = new Statistics(config);
+            if (!stats.Compute(files))
                 return false;
 
             if (stats.totalPlays == 0)
@@ -180,7 +221,7 @@ namespace ZStats
             return stats.totalPlays > 0;
         }
 
-        static bool RunExpression(string expression, string name)
+        static bool RunMCExpression(string expression, string name)
         {
             Console.WriteLine($"Executing {name} expression");
             int ok = 0;
@@ -189,7 +230,7 @@ namespace ZStats
             foreach (var file in files)
             {
                 if (count++ % 9 == 0)
-                    Console.Write($"  file {count} of {files.Length}\r");
+                    Console.Write($"  file {count} of {files.Count}\r");
 
                 if (!mc.EvaluateExpression(file.Key, expression, out _))
                     err++;
@@ -200,7 +241,7 @@ namespace ZStats
             return true;
         }
 
-        static bool UpdatePlayLists()
+        static bool UpdateMCPlayLists()
         {
             if (config.playlists.Count == 0)
                 Console.WriteLine("  No playlists defined in config file");
@@ -214,44 +255,115 @@ namespace ZStats
                     var mclist = mclists.Where(l => l.name.ToLower() == list.name.ToLower()).SingleOrDefault();
                     if (mclist != null)
                     {
+                        // clear existing playlist
                         Console.WriteLine($"  Updating List: {list.name}");
-                        mc.DeletePlaylist(mclist.id);
+                        mc.ClearPlaylist(mclist.id);
                     }
                     else
+                    {
+                        // create new playlist
                         Console.WriteLine($"  Creating List: {list.name}");
+                        mclist = new MCPlaylist(list.name, 0);
+                        if (!mc.CreatePlaylist(list.name, out mclist.id))
+                            Console.WriteLine($"    FAILED to create playlist!");
+                        else
+                            mclists.Add(mclist);
+                    }
 
-                    if (!mc.BuildPlaylist(list.name, list.files.Select(f => f.Key).ToList(), out int id))
-                        Console.WriteLine($"    FAILED!");
+                    // add files in blocks of 100
+                    var files = list.files.Select(f => f.Key).ToList();
+                    int batchsize = Config.MC_PLAYLIST_BATCH;
+                    for (int i = 0; i < files.Count(); i += batchsize)
+                        if (!mc.AddPlaylistFiles(mclist.id, files.Skip(i).Take(batchsize).ToList()))
+                        {
+                            Console.WriteLine($"    FAILED to add files to playlist!");
+                            break;
+                        }
                 }
             }
             return true;
         }
 
-        static bool UpdateStats()
+        static bool UpdateMCStats()
         {
-            Console.WriteLine($"Updating statistics field [{config.statsField}]");
-            int ok = 0;
-            int err = 0;
-            int same = 0;
-            int count = 0;
-            foreach (var file in files)
+            foreach (var group in config.statGroups)
             {
-                if (count++ % 9 == 0)
-                    Console.Write($"  updating file {count} of {files.Length}\r");
+                if (!group.enabled) continue;
 
-                if (file.Stats == file.newStats)
-                    same++;
-                else if (!mc.SetField(file.Key, config.statsField, file.newStats))
+                Console.WriteLine($"Updating statistics field [{group.UpdateField}], grouped by [{group.GroupByField}]");
+
+                Dictionary<string, string> templateGroups = new Dictionary<string, string>();
+
+                int ok = 0;
+                int err = 0;
+                int same = 0;
+                int count = 0;
+                foreach (var file in files)
                 {
-                    err++;
-                    Console.WriteLine($"  FAILED to set field [{config.statsField}] on file {file.Key}:{file.Name}");
-                }
-                else ok++;
-            }
+                    if (count++ % 9 == 0)
+                        Console.Write($"  updating file {count} of {files.Count}\r");
 
-            Console.WriteLine($"  Updated {ok} files, {same} unchanged, {err} errors");
+                    string currStats = file.getProperty(group.UpdateField);
+                    string template = group.Template;
+                    if (string.IsNullOrEmpty(group.GroupByField) || group.GroupByField.ToLower() == "key")
+                        template = fillTemplate(template, file, config);
+                    else
+                    {
+                        string key = file.getProperty(group.GroupByField)?.ToLower();
+                        if (!templateGroups.ContainsKey(key))
+                        {
+                            var fgroup = files.Where(f => f.getProperty(group.GroupByField).Equals(key, StringComparison.InvariantCultureIgnoreCase)).ToList();
+                            templateGroups[key] = fillGroupTemplate(template, fgroup, config);
+                        }
+                        template = templateGroups[key];
+                    } 
+                    if (group.append) template = $"{currStats}{template}";
+                    if (currStats == template)
+                        same++;
+                    else if (!mc.SetField(file.Key, group.UpdateField, template))
+                    {
+                        err++;
+                        Console.WriteLine($"  FAILED to set field [{group.UpdateField}] on file {file.Key}:{file.Name}");
+                    }
+                    else ok++;
+                }
+                Console.WriteLine($"  Updated {ok} files, {same} unchanged, {err} errors");
+            }
             return true;
         }
 
+        public static string fillTemplate(string template, MCFile file, Config config)
+        {
+            string tLower = template.ToLower();
+            foreach (var token in config.uniqueTokens)
+            {
+                if (tLower.Contains(token.text))
+                {
+                    string value = file.StatsValue(token.text).ToString();
+                    if (token.type == TokenType.PerYear) value = string.Join(config.seriesSeparator, file.YearStatsValue(token.text));
+                    if (token.type == TokenType.PerMonth) value = string.Join(config.seriesSeparator, file.monthlyStats);
+                    if (token.type == TokenType.PerWeekday) value = string.Join(config.seriesSeparator, file.weekdayStats);
+                    template = Regex.Replace(template, $@"\[{token.text}\]", value, RegexOptions.IgnoreCase);
+                }
+            }
+            return template;
+        }
+
+        public static string fillGroupTemplate(string template, List<MCFile> groupFiles, Config config)
+        {
+            string tLower = template.ToLower();
+            foreach (var token in config.uniqueTokens)
+            {
+                if (tLower.Contains(token.text))
+                {
+                    string value = groupFiles.Sum(f => f.StatsValue(token.text)).ToString();
+                    if (token.type == TokenType.PerYear) value = string.Join(config.seriesSeparator, Util.SumArrays(groupFiles.Select(f=>f.YearStatsValue(token.text)).ToList()));
+                    if (token.type == TokenType.PerMonth) value = string.Join(config.seriesSeparator, Util.SumArrays(groupFiles.Select(f => f.monthlyStats).ToList()));
+                    if (token.type == TokenType.PerWeekday) value = string.Join(config.seriesSeparator, Util.SumArrays(groupFiles.Select(f => f.weekdayStats).ToList()));
+                    template = Regex.Replace(template, $@"\[{token.text}\]", value, RegexOptions.IgnoreCase);
+                }
+            }
+            return template;
+        }
     }
 }
