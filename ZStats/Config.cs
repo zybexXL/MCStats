@@ -27,6 +27,8 @@ namespace ZStats
         public string historyFormat { get { return getProp("historyformat"); } }
         public string listSeparator { get { return getProp("historyseparator", ";"); } }
         public string seriesSeparator { get { return getProp("seriesseparator", ","); } }
+        public bool verbose { get { return getProp("verbose", "0") == "1"; } }
+
 
         public int midnightOffset { get {
                 if (_midnightOffset < 0)

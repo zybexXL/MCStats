@@ -51,7 +51,7 @@ namespace ZStats
         public bool Process(string dateFormat, int offsetMinutes)
         {
 #if DEBUG
-            //GenerateRandomDates();
+            GenerateRandomDates();
 #endif
             if (!ParseHistory(dateFormat, offsetMinutes)) return false;
             if (played.Count > 0) startYear = played.Min(p => p.Year);
@@ -63,6 +63,7 @@ namespace ZStats
             played = new List<DateTime>();
             if (string.IsNullOrEmpty(History)) return true;
 
+            History = Regex.Replace(History, @"[\.,]", CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator);
             var entries = History.Split(new string[] { Program.config.listSeparator }, StringSplitOptions.RemoveEmptyEntries);
             bool numeric = Double.TryParse(entries[0], out _);
 

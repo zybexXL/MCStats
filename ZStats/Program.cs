@@ -14,19 +14,12 @@ namespace ZStats
 {
     class Program
     {
-
-#if DEBUG
-        static bool debug = true;
-#else
-        static bool debug = false;
-#endif
-
         static MCWS mc;
         public static Config config;
         static List<MCFile> files = new List<MCFile>();
 
         static readonly Version RequiredVersion = new Version(28, 0, 93);
-        static readonly Version ZStatsVersion = new Version(0, 9, 4);
+        static readonly Version ZStatsVersion = new Version(0, 9, 5);
 
         static void Main(string[] args)
         {
@@ -59,7 +52,7 @@ namespace ZStats
 
         static bool Connect()
         {
-            mc = new MCWS(config.MCserver, config.MCuser, config.MCpass, debug);
+            mc = new MCWS(config.MCserver, config.MCuser, config.MCpass, config.verbose);
             Console.WriteLine($"Connecting to {mc.hostURL}");
 
             if (!mc.GetVersion(out Version ver, out string app, out string platform, out string friendly))
