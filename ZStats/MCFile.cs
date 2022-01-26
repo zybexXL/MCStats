@@ -28,7 +28,7 @@ namespace ZStats
         [DataMember]
         public string PreHistory { get; set; }
 
-        public string getProperty(string name) => jsonObject.GetValue(name)?.ToString();
+        public string getProperty(string name) => jsonObject.GetValue(name, StringComparison.OrdinalIgnoreCase)?.ToString() ?? "";
 
         public JObject jsonObject;
         public List<DateTime> played = new List<DateTime>();

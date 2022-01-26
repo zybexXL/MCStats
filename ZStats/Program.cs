@@ -19,7 +19,7 @@ namespace ZStats
         static List<MCFile> files = new List<MCFile>();
 
         static readonly Version RequiredVersion = new Version(28, 0, 93);
-        static readonly Version ZStatsVersion = new Version(1, 0, 2);
+        static readonly Version ZStatsVersion = new Version(1, 0, 3);
 
         static void Main(string[] args)
         {
@@ -159,7 +159,7 @@ namespace ZStats
                     }
                     if (group.GroupByField.ToLower() != "key" && !fields.Contains(group.GroupByField, StringComparer.InvariantCultureIgnoreCase))
                     {
-                        Console.WriteLine($"  grouping field [{group.UpdateField}] does not exist");
+                        Console.WriteLine($"  grouping field [{group.GroupByField}] does not exist");
                         //if (!config.createFields) return false;
                         //if (!mc.CreateField(group.UpdateField))
                             return false;
