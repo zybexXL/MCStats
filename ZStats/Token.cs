@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace ZStats
 {
-    public enum TokenType { Range, Year, Month, Weekday, PerYear, PerMonth, PerWeekday, Recent, Unpopular, Unplayed }
+    public enum TokenType { Range, Year, Month, Weekday, PerYear, PerMonth, PerWeekday, Recent, Unpopular, Unplayed, PreHistory }
     public enum Weekdays { Sun = 0, Mon, Tue, Wed, Thu, Fri, Sat }      // C# enum uses Sun=0 on DayOfWeek enum
     public enum Months { Jan = 1, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec }
     
@@ -152,7 +152,7 @@ namespace ZStats
             }
 
             // fixed tokens
-            m = Regex.Match(txt, @"^(total|weekends?|permonth|perweekday|peryear|recent|unpopular|unplayed)([,=](\d+))?$");
+            m = Regex.Match(txt, @"^(total|prehistory|weekends?|permonth|perweekday|peryear|recent|unpopular|unplayed)([,=](\d+))?$");
             if (m.Success)
             {
                 switch (m.Groups[1].Value)
@@ -171,6 +171,7 @@ namespace ZStats
                     case "peryear":
                     case "permonth":
                     case "perweekday":
+                    case "prehistory":
                         token.type = (TokenType)Enum.Parse(typeof(TokenType), m.Groups[1].Value, true);
                         if (!string.IsNullOrEmpty(m.Groups[3].Value))
                         {

@@ -23,6 +23,8 @@ namespace ZStats
         public bool updatePlaylists { get { return getProp("updateplaylists", "1") == "1"; } }
         public bool runExpressions { get { return getProp("runexpressions", "1") == "1"; } }
         public bool createFields { get { return getProp("createfields", "1") == "1"; } }
+        public bool inferPreHistory { get { return getProp("inferprehistory", "1") == "1"; } }
+        public string preHistoryField { get { return getProp("prehistoryfield"); } }
         public string historyField { get { return getProp("historyfield", "Play History"); } }
         public string historyFormat { get { return getProp("historyformat"); } }
         public string listSeparator { get { return getProp("historyseparator", ";"); } }
@@ -129,7 +131,7 @@ namespace ZStats
                     string key = m.Groups[1].Value.Trim();
                     string value = m.Groups[2].Value.Trim();
 
-                    if (string.IsNullOrEmpty(value) && key.ToLower() != "mcfilter")
+                    if (string.IsNullOrEmpty(value) && key.ToLower() != "mcfilter" && key.ToLower() != "prehistoryfield")
                     {
                         Console.WriteLine($"  Line {i + 1}: missing value for '{key}'");
                         return false;
@@ -152,7 +154,7 @@ namespace ZStats
 
                     else if (section == "jriver")
                     {
-                        ok = Regex.IsMatch(key, "^(mcserver|mcuser|mcpass|mcfilter|updatestats|updateplaylists|runexpressions|createfields|historyfield|historyseparator|seriesseparator|weekstart)$", RegexOptions.IgnoreCase);
+                        ok = Regex.IsMatch(key, "^(mcserver|mcuser|mcpass|mcfilter|updatestats|inferprehistory|prehistoryfield|updateplaylists|runexpressions|createfields|historyfield|historyseparator|seriesseparator|weekstart)$", RegexOptions.IgnoreCase);
                         props[key.ToLower()] = value;
                         //if (key == "weekstart" && config.weekStart < 0)
                         //    ok = false;

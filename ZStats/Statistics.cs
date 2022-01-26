@@ -82,6 +82,9 @@ namespace ZStats
                     case TokenType.Unplayed:
                         file.ComputedStats[token] = file.LastPlayed == DateTime.MinValue ? 1 : 0;
                         break;
+                    case TokenType.PreHistory:
+                        file.ComputedStats[token] = file.PreHistoryCount;
+                        break;
                     case TokenType.Recent:
                         file.ComputedStats[token] = file.LastPlayed < config.Now.AddMonths(-1) ? 0 : 1;
                         break;
@@ -129,6 +132,9 @@ namespace ZStats
                     break;
                 case TokenType.Unpopular:
                     playlist.files = files.Where(f => f.LastPlayed != DateTime.MinValue).OrderBy(f => f.LastPlayed).ToList();
+                    break;
+                case TokenType.PreHistory:
+                    playlist.files = files.Where(f => f.PreHistoryCount > 0).OrderByDescending(f => f.PreHistoryCount).ToList();
                     break;
                 default:
                     playlist.files = files.Where(f => f.StatsValue(playlist.sortToken.text) > 0).OrderByDescending(f => f.StatsValue(playlist.sortToken.text)).ToList();

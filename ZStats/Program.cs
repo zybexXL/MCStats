@@ -19,7 +19,7 @@ namespace ZStats
         static List<MCFile> files = new List<MCFile>();
 
         static readonly Version RequiredVersion = new Version(28, 0, 93);
-        static readonly Version ZStatsVersion = new Version(1, 0, 1);
+        static readonly Version ZStatsVersion = new Version(1, 0, 2);
 
         static void Main(string[] args)
         {
@@ -106,6 +106,9 @@ namespace ZStats
                 if (config.updateStats)
                     if (!UpdateMCStats()) return;
 
+                if (config.inferPreHistory)
+                    if (!UpdateMCPreHistory()) return;
+
                 if (config.updatePlaylists)
                     if (!UpdateMCPlayLists()) return;
             }
@@ -131,6 +134,14 @@ namespace ZStats
                 Console.WriteLine($"  history field [{config.historyField}] does not exist");
                 //if (!config.createFields) return false;
                 //if (!mc.CreateField(config.historyField))
+                    return false;
+            }
+
+            if (!string.IsNullOrEmpty(config.preHistoryField) && !fields.Contains(config.preHistoryField, StringComparer.InvariantCultureIgnoreCase))
+            {
+                Console.WriteLine($"  pre-history field [{config.preHistoryField}] does not exist");
+                if (!config.createFields) return false;
+                if (!mc.CreateField(config.preHistoryField))
                     return false;
             }
 
@@ -163,12 +174,14 @@ namespace ZStats
         static bool ReadMCFiles(bool withHistory)
         {
             Console.WriteLine($"Reading {(withHistory ? "play history" : "file list")}");
-            var fields = new List<string> { "key", "name", "date imported" };
+            var fields = new List<string> { "key", "name", "date imported", "number plays" };
             if (withHistory)
             {
                 fields.AddRange(config.groupbyFields);
                 fields.AddRange(config.outputFields);
                 fields.Add(config.historyField);
+                if (config.inferPreHistory && !string.IsNullOrEmpty(config.preHistoryField))
+                    fields.Add(config.preHistoryField);
                 fields = fields.Distinct().ToList();
             }
 
@@ -177,7 +190,11 @@ namespace ZStats
                 string data = mc.SearchFiles(config.MCfilter, fields);
                 if (data == null) return false;
 
-                data = Regex.Replace(data, $"\"{config.historyField}\":", "\"History\":", RegexOptions.IgnoreCase);
+                if (withHistory)
+                    data = Regex.Replace(data, $"\"{config.historyField}\":", "\"History\":", RegexOptions.IgnoreCase);
+                if (withHistory && !string.IsNullOrEmpty(config.preHistoryField))
+                    data = Regex.Replace(data, $"\"{config.preHistoryField}\":", "\"PreHistory\":", RegexOptions.IgnoreCase);
+
                 var objList = JArray.Parse(data);
 
                 files = new List<MCFile>();
@@ -322,6 +339,44 @@ namespace ZStats
                 }
                 Console.WriteLine($"  Updated {ok} files, {same} unchanged, {err} errors");
             }
+            return true;
+        }
+
+        public static bool UpdateMCPreHistory()
+        {
+            if (!config.inferPreHistory || string.IsNullOrEmpty(config.preHistoryField))
+                return true;
+
+            Console.WriteLine($"Updating Pre-History field [{config.preHistoryField}]");
+
+            int ok = 0;
+            int err = 0;
+            int same = 0;
+            int count = 0;
+
+            foreach (var file in files)
+            {
+                if (count++ % 9 == 0)
+                    Console.Write($"  updating file {count} of {files.Count}\r");
+
+                string currPrehistory = file.PreHistory ?? "";
+                string preHistory = "";
+                if (string.IsNullOrEmpty(config.historyFormat))
+                    preHistory = string.Join(config.listSeparator, file.prePlayed.OrderByDescending(d=>d).Select(d => Util.Datetime2Excel(d).ToString()));
+                else
+                    preHistory = string.Join(config.listSeparator, file.prePlayed.OrderByDescending(d => d).Select(d => d.ToString(config.historyFormat)));
+
+                if (currPrehistory == preHistory)
+                    same++;
+                else if (!mc.SetField(file.Key, config.preHistoryField, preHistory))
+                {
+                    err++;
+                    Console.WriteLine($"  FAILED to set field [{config.preHistoryField}] on file {file.Key}:{file.Name}");
+                }
+                else ok++;
+            }
+
+            Console.WriteLine($"  Updated {ok} files, {same} unchanged, {err} errors");
             return true;
         }
 

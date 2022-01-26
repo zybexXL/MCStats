@@ -11,6 +11,8 @@ namespace ZStats
 {
     internal static class Util
     {
+        static DateTime MCEpoch = new DateTime(1899, 12, 30);
+
         internal static string GetEmbeddedResource(string name)
         {
             var assembly = Assembly.GetExecutingAssembly();
@@ -34,7 +36,17 @@ namespace ZStats
 
         internal static DateTime Excel2Datetime(double days1900)
         {
-            return new DateTime(1899, 12, 30).AddDays(days1900);
+            return MCEpoch.AddDays(days1900);
+        }
+
+        internal static double Datetime2Excel(DateTime date)
+        {
+            return (date - MCEpoch).TotalDays;
+        }
+
+        internal static DateTime Epoch2Datetime(long epoch)
+        {
+            return new DateTime(1970, 1, 1).AddSeconds(epoch).ToLocalTime();
         }
     }
 }
