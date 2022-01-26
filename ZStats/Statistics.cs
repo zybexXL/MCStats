@@ -39,8 +39,8 @@ namespace ZStats
 
             // calculate file stats
             foreach (var file in files)
-            if (!ComputeStats(file))
-                return false;
+                if (!ComputeStats(file))
+                    return false;
 
             // populate playlists with top files
             if (config.updatePlaylists)

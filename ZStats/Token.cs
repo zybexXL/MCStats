@@ -10,7 +10,7 @@ namespace ZStats
 {
     public enum TokenType { Range, Year, Month, Weekday, PerYear, PerMonth, PerWeekday, Recent, Unpopular, Unplayed }
     public enum Weekdays { Sun = 0, Mon, Tue, Wed, Thu, Fri, Sat }      // C# enum uses Sun=0 on DayOfWeek enum
-    public enum Months { Jan = 1, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Nov, Dec }
+    public enum Months { Jan = 1, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec }
     
     public class Token
     {
@@ -46,7 +46,7 @@ namespace ZStats
 
         public static DateTime AddOffset(DateTime date, string delta, int defaultDelta, string defaultUnit)
         {
-            var m = Regex.Match(delta, @",?([-+]\d+)([hwdmy])?", RegexOptions.IgnoreCase);
+            var m = Regex.Match(delta, @",?([-+]?\d+)([hwdmy])?", RegexOptions.IgnoreCase);
 
             int offset = !m.Success ? defaultDelta : int.Parse(m.Groups[1].Value);
             string unit = !m.Success || string.IsNullOrEmpty(m.Groups[2].Value) ? defaultUnit : m.Groups[2].Value;
