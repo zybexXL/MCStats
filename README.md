@@ -5,7 +5,8 @@
 
 **ZStats** is designed to be executed periodically (nighly) as a scheduled task to update statistics for all files in an MC library, so that this heavy computation task doesn't need to be run in realtime in MC. Because of this, it does not have a GUI and all settings are done via a *zstats.ini* configuration file.
 
-**ZStats** requires MC v28.0.93 or above
+**ZStats** requires MC v28.0.93 or above.
+
 
 Features
 ------
