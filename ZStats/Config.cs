@@ -154,7 +154,7 @@ namespace ZStats
 
                     else if (section == "jriver")
                     {
-                        ok = Regex.IsMatch(key, "^(mcserver|mcuser|mcpass|mcfilter|updatestats|inferprehistory|prehistoryfield|updateplaylists|runexpressions|createfields|historyfield|historyseparator|seriesseparator|weekstart)$", RegexOptions.IgnoreCase);
+                        ok = Regex.IsMatch(key, "^(mcserver|mcuser|mcpass|mcfilter|updatestats|inferprehistory|prehistoryfield|updateplaylists|runexpressions|createfields|HistoryFormat|historyfield|historyseparator|seriesseparator|weekstart|midnightoffset)$", RegexOptions.IgnoreCase);
                         props[key.ToLower()] = value;
                         //if (key == "weekstart" && config.weekStart < 0)
                         //    ok = false;
@@ -162,7 +162,7 @@ namespace ZStats
 
                     else if (section == "stats")
                     {
-                        ok = Regex.IsMatch(key, "^(enabled|append|template|updatefield|groupbyfield|midnightoffset)$", RegexOptions.IgnoreCase);
+                        ok = Regex.IsMatch(key, "^(enabled|append|template|updatefield|groupbyfield)$", RegexOptions.IgnoreCase);
                         currStats.setProp(key, value);
                     }
 
