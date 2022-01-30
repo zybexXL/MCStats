@@ -28,7 +28,7 @@ namespace ZStats
         [DataMember]
         public string PreHistory { get; set; }
 
-        public string getProperty(string name) => jsonObject.GetValue(name, StringComparison.OrdinalIgnoreCase)?.ToString() ?? "";
+        public string getProperty(string name) => jsonObject.GetValue(name, StringComparison.InvariantCultureIgnoreCase)?.ToString() ?? "";
 
         public JObject jsonObject;
         public List<DateTime> played = new List<DateTime>();
@@ -38,7 +38,7 @@ namespace ZStats
         public List<int> monthlyStats;
         public List<int> weekdayStats;
         public DateTime LastPlayed = DateTime.MinValue;
-        public int startYear = 9999;    // no data
+        public int startYear = DateTime.Now.Year;
 
         static readonly Random rand = new Random();
 
@@ -48,8 +48,7 @@ namespace ZStats
         public int HistoryCount { get; private set; }           // [play history] length
         public int PreHistoryCount { get; private set; }        // [number plays] minus HistoryCount
         public DateTime HistoryStart { get; private set; }      // does not include pre-history
-        public DateTime PreHistoryStart { get; private set; }   // includes pre-history; usually = ImportDate
-
+        
 
         // debug method to generate random History spread out on last 2 years
         void GenerateRandomDates()
@@ -62,37 +61,39 @@ namespace ZStats
             History = string.Join(";", dates);
         }
 
-        public bool Process(string dateFormat, int offsetMinutes)
+        public void Process(string dateFormat, int offsetMinutes)
         {
 #if DEBUG
             GenerateRandomDates();
 #endif
-            if (!ParseHistory(dateFormat, offsetMinutes)) return false;
+            if (!ParseHistory(dateFormat, offsetMinutes)) return;
             HistoryCount = played.Count;
-            HistoryStart = played.Count == 0 ? DateTime.Now : played.Min();
-            PreHistoryStart = Util.Epoch2Datetime(Imported);
+            HistoryStart = played.Count == 0 ? Program.config.Now : played.Min();
             PreHistoryCount = Math.Max(0, NumberPlays - played.Count);
 
-            if (Program.config.inferPreHistory && PreHistoryCount > 0) 
-                GeneratePreHistory();
-
-            if (played.Count > 0) startYear = played.Min(p => p.Year);
-            return true;
+            if (played.Count > 0) 
+                startYear = played.Min(p => p.Year);
         }
 
         // generate missing timestamps if [Number Plays] is larger than [Play History] count
-        void GeneratePreHistory()
+        public void GeneratePreHistory(DateTime historyStart)
         {
-            DateTime date = PreHistoryStart;
-            if (date >= HistoryStart) date = HistoryStart.AddYears(-1);     // hack to push pre-history to older dates
+            if (PreHistoryCount == 0) return;
 
-            double interval = ((HistoryStart - date).TotalSeconds) / PreHistoryCount;
+            DateTime start = Util.Epoch2Datetime(Imported);
+            if (start.Year < 2000) start = new DateTime(2000, 1, 1);          // prevent 1970 default timestamp
+            if (start >= historyStart) start = historyStart.AddYears(-1);     // push pre-history to older dates in case of re-import
+
+            double interval = ((historyStart - start).TotalSeconds) / PreHistoryCount;
             for (int i = 0; i < PreHistoryCount; i++)
             {
-                prePlayed.Add(date);
-                date = date.AddSeconds(interval);
+                prePlayed.Add(start);
+                start = start.AddSeconds(interval);
             }
+
             played.AddRange(prePlayed);
+            if (played.Count > 0)
+                startYear = played.Min(p => p.Year);
         }
 
         bool ParseHistory(string dateFormat, int offsetMinutes)

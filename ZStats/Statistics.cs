@@ -28,10 +28,17 @@ namespace ZStats
             foreach (var file in files)
                 file.Process(config.historyFormat, config.midnightOffset);
 
+            // infer pre-History timestamps
+            if (Program.config.inferPreHistory)
+            {
+                DateTime historyStart = files.Min(f => f.HistoryStart);
+                foreach (var file in files)
+                    file.GeneratePreHistory(historyStart);
+            }
+
             // find earliest History date/year, expand [perYear] playlists
             totalPlays = files.Sum(f => f.played.Count);
             startYear = files.Min(f => f.startYear);
-            if (startYear > 3000) startYear = config.Now.Year;
             if (startYear < 2000) startYear = 2000;
 
             if (config.updatePlaylists)

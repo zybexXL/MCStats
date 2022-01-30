@@ -19,7 +19,7 @@ namespace ZStats
         static List<MCFile> files = new List<MCFile>();
 
         static readonly Version RequiredVersion = new Version(28, 0, 93);
-        static readonly Version ZStatsVersion = new Version(1, 0, 3);
+        static readonly Version ZStatsVersion = new Version(1, 0, 4);
 
         static void Main(string[] args)
         {
@@ -300,7 +300,8 @@ namespace ZStats
             {
                 if (!group.enabled) continue;
 
-                Console.WriteLine($"Updating statistics field [{group.UpdateField}], grouped by [{group.GroupByField}]");
+                string groupStr = group.GroupByField.ToLower() == "key" ? "" : $", grouped by [{group.GroupByField}]";
+                Console.WriteLine($"Updating statistics field [{group.UpdateField}]{groupStr}");
 
                 Dictionary<string, string> templateGroups = new Dictionary<string, string>();
 
