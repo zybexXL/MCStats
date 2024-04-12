@@ -47,6 +47,12 @@ The default configuration sets *UpdateStats=0* and *UpdatePlaylists=1*, so it wi
 
 MC configuration
 ------
-To use **ZStats** you need to first setup MC to collect Play History timestamps, as described in [this thread](https://yabb.jriver.com/interact/index.php/topic,130266.0.html). After setting this up and playing tracks for some time, the *[Play History]* field have been updated with enough information for **ZStats** to process and generate the statistics and playlists.
+To use **ZStats** you need to first setup MC to collect Play History timestamps, as described in [this thread](https://yabb.jriver.com/interact/index.php/topic,130266.0.html). In short:
+1. Create a string field (NOT calculated) called [Play History]
+2. Set the expression in "Options > Library & Folders > Expressions: After Playback Expression" to
+   
+   `setfield(Play History,[Last Played,0];[play history])`
+
+After setting this up and playing tracks for some time, the *[Play History]* field have been updated with enough information for **ZStats** to process and generate the statistics and playlists.
 
 **ZStats** will automatically create the *[Play Stats]* field if it doesn't exist (or any other field name as specified in the *ZStats.ini*). However, the created field will have the flag "*save in file tags*" enabled by default as it cannot be disabled automatically via the MCWS API. This may cause the update process to become even slower as MC will update the *sidecar.xml* for each file as **ZStats** is updating the field. Because of this, I recommend that you manually disable this flag on the *[Play Stats]* MC field.
