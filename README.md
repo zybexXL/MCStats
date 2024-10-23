@@ -35,7 +35,11 @@ Instructions
 6. fine tune the config file to your taste, re-run to update statistics/playlists
 7. Use Windows Task Scheduler to schedule a nightly run of the tool
 
+**ZStats** v1.2 or above also requires Net8 Runtime. Please install the appropriate runtime from here if needed:<br>
+https://dotnet.microsoft.com/en-us/download/dotnet/8.0
+
 <br>
+
 
 ZStats Configuration
 ------
