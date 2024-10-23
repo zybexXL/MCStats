@@ -25,18 +25,26 @@ Features
 
 Instructions
 ------
+
+**ZStats** v1.2 requires Net8 Runtime. Please install the appropriate runtime from here if needed:<br>
+https://dotnet.microsoft.com/en-us/download/dotnet/8.0
+
 **ZStats** requires MC v28.0.93 or above.
 
 1. Create the *[Play History]* field in MC and setup an "After Playback" expression (instructions [below](#mc-configuration))
 2. download the [latest release](https://github.com/zybexXL/MCStats/releases) and place the executable in a folder with Write permissions
-3. run it once - it will create a default *zstats.ini* configuration
-4. edit the config file and enter your MCWS hostname, username and password
-5. run **ZStats.exe** again to process all files and generate Statistics and Playlists
-6. fine tune the config file to your taste, re-run to update statistics/playlists
-7. Use Windows Task Scheduler to schedule a nightly run of the tool
+   
+   2.1. For Linux/MacOS you may need to mark the downloaded binary as Executable:
+   > chmod +x ./ZStats-linux-x64
 
-**ZStats** v1.2 or above also requires Net8 Runtime. Please install the appropriate runtime from here if needed:<br>
-https://dotnet.microsoft.com/en-us/download/dotnet/8.0
+   2.2. MacOS may also require the binary to be signed:
+   > codesign --force --deep -s - ./ZStats-osx-x64
+   
+4. run it once - it will create a default *zstats.ini* configuration
+5. edit the config file and enter your MCWS hostname, username and password
+6. run **ZStats.exe** again to process all files and generate Statistics and Playlists
+7. fine tune the config file to your taste, re-run to update statistics/playlists
+8. Use Windows Task Scheduler to schedule a nightly run of the tool
 
 <br>
 
