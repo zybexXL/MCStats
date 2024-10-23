@@ -2,7 +2,7 @@
 
 <img align="right" src="https://github.com/zybexXL/MCStats/blob/main/ZStats/Docs/zstatsPlaylists.png">
 
-**ZStats aka MCStats is a tool to compile Play History statistics for JRiver Media Center**
+**ZStats aka MCStats is a tool to compile Play History statistics for JRiver Media Center**. It can also be used to execute an MC Expression against each file on the library, eg. to update a pre-calculated field value.
 
 **ZStats** reads the contents of *[Play History]* field from JRiver's Media Center, computes user-defined statistics from the data, and writes back the calculated statistics to an MC field for usage in Views/Expressions/Smartlists. **ZStats** can also create user-defined Playlists for the Top N most played tracks in any given time range. 
 
