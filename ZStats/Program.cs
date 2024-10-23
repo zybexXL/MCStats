@@ -1,14 +1,12 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace ZStats
 {
@@ -19,11 +17,11 @@ namespace ZStats
         static List<MCFile> files = new List<MCFile>();
 
         static readonly Version RequiredVersion = new Version(28, 0, 93);
-        static readonly Version ZStatsVersion = new Version(1, 0, 5);
+        static readonly Version ZStatsVersion = new Version(1, 2, 0);
 
         static void Main(string[] args)
         {
-            Console.WriteLine($"ZStats v{ZStatsVersion} for JRiver MediaCenter, by Zybex\n");
+            Console.WriteLine($"ZStats v{ZStatsVersion.ToString(3)} for JRiver MediaCenter, by Zybex\n");
             DateTime start = DateTime.Now;
             if (args.Length > 0 && Regex.IsMatch(args[0], @"^[-/]"))
             {
@@ -75,6 +73,8 @@ namespace ZStats
             {
                 if (mc.status == 401)
                     Console.WriteLine("Invalid MCWS credentials - please check username and password");
+                if (mc.status == 300)
+                    Console.WriteLine("Authenticated in Read-Only mode - please check username and password");
                 else
                     Console.WriteLine($"Authentication failed with error {mc.status}");
                 return false;
@@ -195,15 +195,7 @@ namespace ZStats
                 if (withHistory && !string.IsNullOrEmpty(config.preHistoryField))
                     data = Regex.Replace(data, $"\"{config.preHistoryField}\":", "\"PreHistory\":", RegexOptions.IgnoreCase);
 
-                var objList = JArray.Parse(data);
-
-                files = new List<MCFile>();
-                foreach (JObject obj in objList)
-                {
-                    MCFile file = obj.ToObject<MCFile>();
-                    file.jsonObject = obj;
-                    files.Add(file);
-                }
+                files = JsonSerializer.Deserialize<MCFile[]>(data)?.ToList();
             }
             catch 
             {

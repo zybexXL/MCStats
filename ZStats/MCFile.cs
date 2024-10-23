@@ -1,36 +1,40 @@
-﻿using Newtonsoft.Json.Linq;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Runtime.Serialization;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace ZStats
 {
-    [DataContract]
+    public class CaseInsensitiveDictionary<T1, T2> : Dictionary<string, T2>
+    {
+        public CaseInsensitiveDictionary() : base(StringComparer.OrdinalIgnoreCase)
+        { }
+    }
+
     public class MCFile
     {
-        [DataMember] public int Key { get; set; }
-        [DataMember] public string Name { get; set; }
+        public int Key { get; set; }
+        public string Name { get; set; }
 
-        [DataMember(Name = "Date Imported")]
+        [JsonPropertyName("Date Imported")]
         public long Imported { get; set; }
 
-        [DataMember(Name = "Number Plays")]
+        [JsonPropertyName("Number Plays")]
         public int NumberPlays { get; set; }
 
-        [DataMember]
         public string History { get; set; }
 
-        [DataMember]
         public string PreHistory { get; set; }
 
-        public string getProperty(string name) => jsonObject.GetValue(name, StringComparison.InvariantCultureIgnoreCase)?.ToString() ?? "";
+        [JsonExtensionData]
+        public CaseInsensitiveDictionary<string, object> ExtensionData { get; set; }
 
-        public JObject jsonObject;
+
+        public string getProperty(string name) => ExtensionData.TryGetValue(name, out object value) ? value?.ToString() ?? "" : "";
+
         public List<DateTime> played = new List<DateTime>();
         public List<DateTime> prePlayed = new List<DateTime>();
         public Dictionary<string, int> ComputedStats;
@@ -64,7 +68,7 @@ namespace ZStats
         public void Process(string dateFormat, int offsetMinutes)
         {
 #if DEBUG
-            GenerateRandomDates();
+            //GenerateRandomDates();
 #endif
             if (!ParseHistory(dateFormat, offsetMinutes)) return;
             HistoryCount = played.Count;
