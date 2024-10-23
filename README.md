@@ -2,7 +2,7 @@
 
 <img align="right" src="https://github.com/zybexXL/MCStats/blob/main/ZStats/Docs/zstatsPlaylists.png">
 
-**ZStats aka MCStats is a tool to compile Play History statistics for JRiver Media Center**
+**ZStats aka MCStats is a tool to compile Play History statistics for JRiver Media Center**. It can also be used to execute an MC Expression against each file on the library, eg. to update a pre-calculated field value.
 
 **ZStats** reads the contents of *[Play History]* field from JRiver's Media Center, computes user-defined statistics from the data, and writes back the calculated statistics to an MC field for usage in Views/Expressions/Smartlists. **ZStats** can also create user-defined Playlists for the Top N most played tracks in any given time range. 
 
@@ -23,9 +23,24 @@ Features
 
 <br>
 
+Requirements
+------
+
+**ZStats** requires MC v28.0.93 or above.
+
+**ZStats** v1.2 requires Net8 Runtime. Please install the appropriate runtime from here if needed:<br>
+https://dotnet.microsoft.com/en-us/download/dotnet/8.0
+
+For Linux/MacOS you may need to mark the downloaded binary as Executable:
+> chmod +x ./ZStats-linux-x64
+
+MacOS may also require the binary to be signed:
+> codesign --force --deep -s - ./ZStats-osx-x64
+
+<br>
+
 Instructions
 ------
-**ZStats** requires MC v28.0.93 or above.
 
 1. Create the *[Play History]* field in MC and setup an "After Playback" expression (instructions [below](#mc-configuration))
 2. download the [latest release](https://github.com/zybexXL/MCStats/releases) and place the executable in a folder with Write permissions
@@ -34,9 +49,6 @@ Instructions
 5. run **ZStats.exe** again to process all files and generate Statistics and Playlists
 6. fine tune the config file to your taste, re-run to update statistics/playlists
 7. Use Windows Task Scheduler to schedule a nightly run of the tool
-
-**ZStats** v1.2 or above also requires Net8 Runtime. Please install the appropriate runtime from here if needed:<br>
-https://dotnet.microsoft.com/en-us/download/dotnet/8.0
 
 <br>
 
