@@ -35,7 +35,7 @@ For Linux/MacOS you may need to mark the downloaded binary as Executable:
 > chmod +x ./ZStats-linux-x64
 
 MacOS may also require the binary to be signed:
-codesign --force --deep -s - ./ZStats-osx-x64
+> codesign --force --deep -s - ./ZStats-osx-x64
 
 <br>
 
