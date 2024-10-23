@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 
 namespace ZStats
 {
-    public class CaseInsensitiveDictionary<T1, T2> : Dictionary<string, T2>
+    public class CaseInsensitiveDictionary<T2> : Dictionary<string, T2>
     {
         public CaseInsensitiveDictionary() : base(StringComparer.OrdinalIgnoreCase)
         { }
@@ -30,7 +30,7 @@ namespace ZStats
         public string PreHistory { get; set; }
 
         [JsonExtensionData]
-        public CaseInsensitiveDictionary<string, object> ExtensionData { get; set; }
+        public CaseInsensitiveDictionary<object> ExtensionData { get; set; }        // string key
 
 
         public string getProperty(string name) => ExtensionData.TryGetValue(name, out object value) ? value?.ToString() ?? "" : "";

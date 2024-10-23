@@ -17,7 +17,7 @@ namespace ZStats
         static List<MCFile> files = new List<MCFile>();
 
         static readonly Version RequiredVersion = new Version(28, 0, 93);
-        static readonly Version ZStatsVersion = new Version(1, 2, 0);
+        static readonly Version ZStatsVersion = new Version(1, 2, 1);
 
         static void Main(string[] args)
         {

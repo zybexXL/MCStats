@@ -2,9 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace ZStats
 {
@@ -121,7 +119,13 @@ namespace ZStats
                         return false;
                     }
 
-                    m = Regex.Match(line, @"^(.+?)=(.+?)(#.*)?$");
+                    // remove comments
+                    line = line.Replace("/#", "\u22B0");
+                    if (line.Contains('#'))
+                        line = line.Substring(0, line.IndexOf('#'));
+                    line = line.Replace("\u22B0", "#").Trim();
+
+                    m = Regex.Match(line, @"^(.+?)=(.+?)$");
                     if (!m.Success)
                     {
                         Console.WriteLine($"  Line {i + 1}: syntax error");

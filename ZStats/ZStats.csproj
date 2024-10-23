@@ -13,7 +13,7 @@
     <AssemblyTitle>ZStats</AssemblyTitle>
     <Product>ZStats</Product>
     <Copyright>Copyright ©  2024</Copyright>
-    <AssemblyVersion>1.2.0.0</AssemblyVersion>
-    <FileVersion>1.2.0.0</FileVersion>
+    <AssemblyVersion>1.2.1.0</AssemblyVersion>
+    <FileVersion>1.2.1.0</FileVersion>
   </PropertyGroup>
 </Project>
