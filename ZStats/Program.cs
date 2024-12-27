@@ -34,7 +34,7 @@ namespace ZStats
                 string configfile = args.Length > 0 ? args[0] : "zstats.ini";
                 config = Config.Load(configfile, true);
                 if (config == null && args.Length == 0) 
-                    config = Config.Load(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), configfile), true);
+                    config = Config.Load(Path.Combine(Path.GetDirectoryName(AppContext.BaseDirectory), configfile), true);
                 if (config == null || !config.valid) return;
 
                 if (Connect())

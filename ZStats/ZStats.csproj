@@ -2,6 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <DebugType>embedded</DebugType>
+    <ApplicationIcon>ZStats.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="SampleConfig.ini" />
